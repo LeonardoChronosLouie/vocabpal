@@ -20,7 +20,23 @@ const state = {
   stem: true,
   bookmarks: loadBookmarks(),
   meanings: new Map(),  // word -> 在线词典结果缓存
+  dict: loadDictSettings(), // { provider: 'youdao' | 'dictionaryapi' | 'custom:0'..., customs: [...] }
 };
+
+/* ---------------- 词典接口设置（localStorage） ---------------- */
+const DICT_SETTINGS_KEY = 'vocabpal.dict.settings.v1';
+
+function loadDictSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(DICT_SETTINGS_KEY) || 'null');
+    if (s && s.customs && Array.isArray(s.customs)) return s;
+  } catch (e) { /* 忽略损坏数据 */ }
+  return { provider: 'youdao', customs: [] };
+}
+
+function saveDictSettings() {
+  localStorage.setItem(DICT_SETTINGS_KEY, JSON.stringify(state.dict));
+}
 
 /* ---------------- DOM 快捷引用 ---------------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -332,8 +348,35 @@ function maybeReExtract() {
 }
 
 /* ============================================================
- * 单词详情（在线词典释义 + 发音）
+ * 单词详情（词典接口查询 + 发音，接口可在设置中更换）
  * ============================================================ */
+async function fetchMeaning(word) {
+  const s = state.dict;
+  // 自定义接口：POST 配置给后端代为请求
+  if (typeof s.provider === 'string' && s.provider.startsWith('custom:')) {
+    const idx = Number(s.provider.slice(7));
+    const cfg = s.customs[idx];
+    if (!cfg || !cfg.urlTemplate || !cfg.resultPath) {
+      // 配置失效，退回有道
+      const r = await fetch('/api/dict/' + encodeURIComponent(word) + '?p=youdao');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }
+    const r = await fetch('/api/dict/custom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word, config: cfg }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+  // 内置接口
+  const provider = ['youdao', 'dictionaryapi'].includes(s.provider) ? s.provider : 'youdao';
+  const r = await fetch('/api/dict/' + encodeURIComponent(word) + '?p=' + encodeURIComponent(provider));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
 async function openDetail(word) {
   $('#detailWord').textContent = word;
   $('#detailPhonetic').textContent = '';
@@ -345,10 +388,7 @@ async function openDetail(word) {
   let data = state.meanings.get(word);
   if (data === undefined) {
     try {
-      const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const arr = await r.json();
-      data = (Array.isArray(arr) && arr[0]) || null;
+      data = await fetchMeaning(word);
     } catch {
       data = null;
     }
@@ -358,21 +398,36 @@ async function openDetail(word) {
 }
 
 function renderDetail(word, data) {
-  if (!data) {
+  if (!data || (!data.zhMeanings && !data.enMeanings && !data.customTexts)) {
     $('#detailMeanings').innerHTML =
-      '<div class="detail-offline">未找到在线释义（离线或词条不存在）。单词仍可点按发音，或点击 ☆ 收藏到生词本。</div>';
+      '<div class="detail-offline">未找到该单词的释义（离线、接口不可用或词条不存在）。单词仍可点按发音，或点击 ☆ 收藏到生词本。<br>可点击右上角 ⚙️ 更换词典接口试试。</div>';
     return;
   }
-  const ph = data.phonetic || (data.phonetics || []).find((p) => p.text)?.text || '';
-  $('#detailPhonetic').textContent = ph ? '/ ' + ph + ' /' : '';
 
-  const meanings = (data.meanings || []).slice(0, 3).map((m) => {
-    const defs = (m.definitions || []).slice(0, 3).map((d) => `
-        <p class="def">• ${esc(d.definition || '')}</p>
-        ${d.example ? `<p class="ex">例：${esc(d.example)}</p>` : ''}`).join('');
-    return `<div class="meaning"><span class="pos">${esc(m.partOfSpeech || '')}</span>${defs}</div>`;
-  }).join('');
-  $('#detailMeanings').innerHTML = meanings || '<div class="detail-offline">该词条暂无释义。</div>';
+  // 音标行
+  const phParts = [];
+  if (data.phoneticUs) phParts.push(`美 / ${esc(data.phoneticUs)} /`);
+  if (data.phoneticUk) phParts.push(`英 / ${esc(data.phoneticUk)} /`);
+  if (!phParts.length && data.phonetic) phParts.push(`/ ${esc(data.phonetic)} /`);
+  if (!phParts.length && data.phoneticText) phParts.push(`/ ${esc(data.phoneticText)} /`);
+  $('#detailPhonetic').textContent = phParts.join('　');
+
+  let html = '';
+  if (data.provider === 'youdao') {
+    html = data.zhMeanings.map((s) => `<div class="meaning"><span class="zh">${esc(s)}</span></div>`).join('');
+    if (data.wfs && data.wfs.length) html += `<p class="wfs">词形变化：${data.wfs.map(esc).join(' · ')}</p>`;
+    if (data.examTypes && data.examTypes.length) html += `<p class="wfs">考试要求：${data.examTypes.map(esc).join(' · ')}</p>`;
+  } else if (data.provider === 'dictionaryapi') {
+    html = data.enMeanings.map((m) => `<div class="meaning"><span class="pos">${esc(m.pos)}</span>${
+      m.defs.map((d) => `<p class="def">• ${esc(d.def)}</p>${d.ex ? `<p class="ex">例：${esc(d.ex)}</p>` : ''}`).join('')
+    }</div>`).join('');
+  } else if (data.provider === 'custom') {
+    html = data.customTexts.map((s) => `<div class="meaning"><span class="zh">${esc(s)}</span></div>`).join('');
+  }
+
+  if (data.note) html += `<p class="wfs">💡 ${esc(data.note)}</p>`;
+  html += `<p class="wfs">来源：${esc(data.sourceName || data.provider || '未知')}</p>`;
+  $('#detailMeanings').innerHTML = html;
 }
 
 $('#detailSpeakBtn').addEventListener('click', () => speak($('#detailWord').textContent));
@@ -511,6 +566,174 @@ function download(content, name, type) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+/* ============================================================
+ * 词典接口设置弹窗
+ * ============================================================ */
+let editingCustomIdx = null; // null=新增，数字=编辑第几个
+
+const BUILTIN_DEFS = [
+  { id: 'youdao', name: '有道词典', desc: '中文释义 · 英美音标 · 词形变化' },
+  { id: 'dictionaryapi', name: 'Free Dictionary', desc: '英文释义 · 音标 · 例句（dictionaryapi.dev）' },
+];
+
+function providerLabel(provider) {
+  if (typeof provider === 'string' && provider.startsWith('custom:')) {
+    const idx = Number(provider.slice(7));
+    const c = state.dict.customs[idx];
+    return c ? '自定义：' + c.name : '自定义接口';
+  }
+  const b = BUILTIN_DEFS.find((x) => x.id === provider);
+  return b ? b.name : '有道词典';
+}
+
+function openSettings() {
+  renderSettings();
+  $('#settingsModal').hidden = false;
+}
+
+function renderSettings() {
+  // 内置接口
+  $('#builtinList').innerHTML = BUILTIN_DEFS.map((b) => `
+    <label class="provider-item">
+      <input type="radio" name="provider" value="${b.id}" ${state.dict.provider === b.id ? 'checked' : ''}>
+      <div class="provider-info"><b>${esc(b.name)}</b><span class="muted">${esc(b.desc)}</span></div>
+    </label>`).join('');
+
+  // 自定义接口
+  const customs = state.dict.customs;
+  $('#customEmpty').style.display = customs.length ? 'none' : 'block';
+  $('#customList').innerHTML = customs.map((c, i) => `
+    <div class="provider-item custom-item">
+      <label class="provider-main">
+        <input type="radio" name="provider" value="custom:${i}" ${state.dict.provider === 'custom:' + i ? 'checked' : ''}>
+        <div class="provider-info"><b>${esc(c.name || '未命名接口')}</b><span class="muted">${esc(c.urlTemplate || '')}</span></div>
+      </label>
+      <div class="custom-ops">
+        <button class="btn btn-round small" data-custom-edit="${i}" title="编辑">✏️</button>
+        <button class="btn btn-round small" data-custom-del="${i}" title="删除">🗑</button>
+      </div>
+    </div>`).join('') || '';
+
+  // 选中变化即保存
+  $$('input[name="provider"]', $('#settingsModal')).forEach((el) => {
+    el.addEventListener('change', () => {
+      state.dict.provider = el.value;
+      saveDictSettings();
+      toast('已切换词典接口：' + providerLabel(el.value), 'success');
+    });
+  });
+  $$('[data-custom-edit]', $('#settingsModal')).forEach((btn) => {
+    btn.addEventListener('click', () => openCustomForm(Number(btn.dataset.customEdit)));
+  });
+  $$('[data-custom-del]', $('#settingsModal')).forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.customDel);
+      state.dict.customs.splice(i, 1);
+      if (state.dict.provider === 'custom:' + i) state.dict.provider = 'youdao';
+      saveDictSettings();
+      renderSettings();
+      toast('已删除自定义接口', 'info');
+    });
+  });
+}
+
+function openCustomForm(idx) {
+  editingCustomIdx = idx;
+  const c = idx != null ? state.dict.customs[idx] : null;
+  $('#customFormTitle').textContent = c ? '编辑接口：' + c.name : '添加自定义接口';
+  $('#cfgName').value = c ? c.name : '';
+  $('#cfgUrl').value = c ? c.urlTemplate : '';
+  $('#cfgMethod').value = c ? (c.method || 'GET') : 'GET';
+  $('#cfgHeaders').value = c && c.headers ? JSON.stringify(c.headers, null, 2) : '';
+  $('#cfgBody').value = c ? (c.bodyTemplate || '') : '';
+  $('#cfgResultPath').value = c ? c.resultPath : '';
+  $('#cfgPhoneticPath').value = c ? (c.phoneticPath || '') : '';
+  $('#cfgBodyRow').hidden = $('#cfgMethod').value !== 'POST';
+  $('#customTestResult').hidden = true;
+  $('#customForm').hidden = false;
+  $('#customForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function collectCustomForm() {
+  const name = $('#cfgName').value.trim();
+  const urlTemplate = $('#cfgUrl').value.trim();
+  const method = $('#cfgMethod').value;
+  let headers = {};
+  const headersRaw = $('#cfgHeaders').value.trim();
+  if (headersRaw) {
+    try { headers = JSON.parse(headersRaw); }
+    catch { toast('请求头不是合法的 JSON', 'error'); return null; }
+  }
+  let bodyTemplate = $('#cfgBody').value.trim();
+  if (method === 'POST' && !bodyTemplate) bodyTemplate = '{"word":"{word}"}';
+  const resultPath = $('#cfgResultPath').value.trim();
+  const phoneticPath = $('#cfgPhoneticPath').value.trim();
+  if (!name || !urlTemplate || !resultPath) {
+    toast('请填写：接口名称、URL 模板、释义路径', 'warn');
+    return null;
+  }
+  if (!urlTemplate.includes('{word}')) {
+    toast('URL 模板需要包含 {word} 占位符', 'warn');
+    return null;
+  }
+  return { name, urlTemplate, method, headers, bodyTemplate, resultPath, phoneticPath };
+}
+
+async function testCustomInterface() {
+  const cfg = collectCustomForm();
+  if (!cfg) return;
+  const out = $('#customTestResult');
+  out.hidden = false;
+  out.className = 'custom-test';
+  out.textContent = '正在测试（单词：test）…';
+  try {
+    const r = await fetch('/api/dict/custom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word: 'test', config: cfg }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    if (data.customTexts && data.customTexts.length) {
+      out.className = 'custom-test ok';
+      out.textContent = '✅ 查询成功：' + data.customTexts.slice(0, 3).join(' ｜ ');
+    } else if (data.provider && data.provider !== 'custom') {
+      out.className = 'custom-test warn';
+      out.textContent = '⚠️ 接口未查到，已兜底：' + (data.note || data.sourceName || '其他接口');
+    } else {
+      out.className = 'custom-test warn';
+      out.textContent = '⚠️ 接口返回正常但未取到释义，请检查「释义路径」';
+    }
+  } catch (e) {
+    out.className = 'custom-test err';
+    out.textContent = '❌ 测试失败：' + e.message;
+  }
+}
+
+function saveCustomForm() {
+  const cfg = collectCustomForm();
+  if (!cfg) return;
+  if (editingCustomIdx == null) {
+    state.dict.customs.push(cfg);
+    state.dict.provider = 'custom:' + (state.dict.customs.length - 1);
+    toast('已添加自定义接口', 'success');
+  } else {
+    state.dict.customs[editingCustomIdx] = cfg;
+    toast('已保存修改', 'success');
+  }
+  saveDictSettings();
+  editingCustomIdx = null;
+  $('#customForm').hidden = true;
+  renderSettings();
+}
+
+$('#settingsBtn').addEventListener('click', openSettings);
+$('#addCustomBtn').addEventListener('click', () => openCustomForm(null));
+$('#saveCustomBtn').addEventListener('click', saveCustomForm);
+$('#cancelCustomBtn').addEventListener('click', () => { editingCustomIdx = null; $('#customForm').hidden = true; });
+$('#testCustomBtn').addEventListener('click', testCustomInterface);
+$('#cfgMethod').addEventListener('change', () => { $('#cfgBodyRow').hidden = $('#cfgMethod').value !== 'POST'; });
 
 /* ---------------- 初始化 ---------------- */
 render();

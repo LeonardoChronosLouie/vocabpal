@@ -260,6 +260,50 @@ main {
 .review-result .word-list { justify-content: center; margin: 10px 0 14px; }
 .review-result-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
+/* ---------- settings ---------- */
+.modal.settings { max-width: 640px; }
+.settings-h { margin: 16px 0 8px; font-size: 14px; color: var(--muted); }
+.provider-list { display: grid; gap: 8px; }
+.provider-item {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; background: #fafbff; cursor: pointer;
+}
+.provider-item:hover { border-color: var(--primary); }
+.provider-item input[type="radio"] { accent-color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; }
+.provider-info { display: grid; line-height: 1.4; }
+.provider-info b { font-size: 14px; }
+.provider-info .muted { font-size: 12px; }
+.custom-item { justify-content: space-between; }
+.provider-main { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
+.provider-main .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-ops { display: flex; gap: 4px; }
+.btn.btn-round.small { width: 30px; height: 30px; font-size: 13px; }
+
+.custom-form {
+  margin-top: 14px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px;
+  background: #fafbff; display: grid; gap: 10px;
+}
+.form-row { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.form-row code { background: #eef0fe; color: var(--primary); padding: 0 5px; border-radius: 4px; }
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  font-size: 13.5px; font-family: inherit; background: #fff; color: var(--ink);
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+  outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,91,214,.12);
+}
+.form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.custom-test { margin-top: 4px; padding: 10px 12px; border-radius: 8px; font-size: 13px; background: #f1f3f9; }
+.custom-test.ok { background: #e9f9ef; color: var(--success); }
+.custom-test.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.custom-test.err { background: #fdecec; color: var(--danger); }
+.settings-foot { margin-top: 12px; font-size: 12px; }
+
+/* ---------- word detail ---------- */
+.meaning .zh { font-size: 15px; line-height: 1.7; }
+.wfs { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+
 /* ---------- toast ---------- */
 .toast-box { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 100; }
 .toast {

@@ -17,6 +17,7 @@
     </div>
   </div>
   <div class="top-actions">
+    <button id="settingsBtn" class="btn btn-round" title="词典接口设置">⚙️</button>
     <button id="reviewBtn" class="btn btn-ghost" title="把当前列表变成听力复习">🔁 听音复习</button>
     <button id="exportTxtBtn" class="btn btn-ghost" title="导出 TXT">⬇ TXT</button>
     <button id="exportCsvBtn" class="btn btn-ghost" title="导出 CSV">⬇ CSV</button>
@@ -105,7 +106,7 @@
     </div>
     <p id="detailPhonetic" class="phonetic"></p>
     <div id="detailMeanings" class="meanings"></div>
-    <p class="modal-foot">释义来自免费在线词典（需联网）；发音使用系统语音，离线可用。</p>
+    <p class="modal-foot">释义来自所选词典接口（需联网，可点右上角 ⚙️ 切换/自定义）；发音使用系统语音，离线可用。</p>
   </div>
 </div>
 
@@ -134,6 +135,69 @@
         <button class="btn btn-primary modal-close" data-close="reviewModal">完成</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 词典接口设置弹窗 -->
+<div id="settingsModal" class="modal-overlay" hidden>
+  <div class="modal settings">
+    <div class="modal-head">
+      <h2>⚙️ 词典接口设置</h2>
+      <button class="btn btn-round modal-close" data-close="settingsModal">✕</button>
+    </div>
+    <p class="muted">选择查词使用的词典接口；所选接口查不到时，会自动尝试其他接口。</p>
+
+    <h3 class="settings-h">内置接口</h3>
+    <div id="builtinList" class="provider-list"></div>
+
+    <h3 class="settings-h">自定义接口</h3>
+    <div id="customList" class="provider-list">
+      <p class="muted" id="customEmpty">还没有自定义接口。</p>
+    </div>
+    <button id="addCustomBtn" class="btn btn-ghost" style="margin-top:8px;">＋ 添加自定义接口</button>
+
+    <div id="customForm" class="custom-form" hidden>
+      <h3 class="settings-h" id="customFormTitle">添加自定义接口</h3>
+      <label class="form-row">
+        <span>接口名称 *</span>
+        <input type="text" id="cfgName" placeholder="如：我的翻译服务">
+      </label>
+      <label class="form-row">
+        <span>URL 模板 *（<code>{word}</code> 代表单词）</span>
+        <input type="text" id="cfgUrl" placeholder="https://api.example.com/dict?q={word}">
+      </label>
+      <label class="form-row">
+        <span>请求方法</span>
+        <select id="cfgMethod">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+        </select>
+      </label>
+      <label class="form-row">
+        <span>请求头（JSON，可选）</span>
+        <textarea id="cfgHeaders" rows="2" placeholder='{"Authorization": "Bearer xxx"}'></textarea>
+      </label>
+      <label class="form-row" id="cfgBodyRow" hidden>
+        <span>请求体模板（JSON，<code>{word}</code> 代表单词）</span>
+        <textarea id="cfgBody" rows="2" placeholder='{"q": "{word}"}'></textarea>
+      </label>
+      <label class="form-row">
+        <span>释义路径 *（响应 JSON 中取释义的字段路径）</span>
+        <input type="text" id="cfgResultPath" placeholder="data.translations">
+      </label>
+      <label class="form-row">
+        <span>音标路径（可选）</span>
+        <input type="text" id="cfgPhoneticPath" placeholder="data.phonetic">
+      </label>
+      <div class="form-actions">
+        <button id="testCustomBtn" class="btn btn-ghost">🧪 测试接口</button>
+        <button id="saveCustomBtn" class="btn btn-primary">保存</button>
+        <button id="cancelCustomBtn" class="btn btn-ghost">取消</button>
+      </div>
+      <div id="customTestResult" class="custom-test" hidden></div>
+    </div>
+
+    <div class="settings-foot muted">设置保存在本机浏览器中；自定义接口的请求由本机服务器代为发出。</div>
   </div>
 </div>
 
