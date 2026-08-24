@@ -1,6 +1,10 @@
 # 依赖
 node_modules/
 
+# 构建产物
+dist/
+lib/pdf.worker.embed.cjs
+
 # 测试生成的 PDF（可用 npm run gen:test 重新生成）
 test-files/
 

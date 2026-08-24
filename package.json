@@ -3,10 +3,20 @@
   "version": "1.0.0",
   "description": "背单词助手：从 PDF 自动提取英文单词、自动去重、点按发音",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
     "start": "node server.js",
     "gen:test": "node scripts/gen-test-pdf.js",
-    "test:api": "node scripts/test-api.mjs"
+    "test:api": "node scripts/test-api.mjs",
+    "build:exe": "node scripts/build-worker-embed.js && pkg . --targets node22-win-x64 --output dist/vocabpal.exe"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "node_modules/pdf-parse/**/*",
+      "node_modules/@napi-rs/canvas-win32-x64-msvc/**/*"
+    ],
+    "outputPath": "dist"
   },
   "engines": {
     "node": ">=16"
@@ -17,6 +27,7 @@
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0",
     "pdfkit": "^0.20.1"
   }
 }

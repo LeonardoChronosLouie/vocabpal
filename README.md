@@ -19,6 +19,10 @@
 
 ## 🚀 快速开始
 
+### 方式零：下载独立版（免安装 Node.js）⭐
+
+到 [Releases](../../releases) 下载 `vocabpal.exe`（约 120MB），双击即可运行，程序会自动打开浏览器进入应用。适合不想装 Node.js 的普通用户。
+
 ### 方式一：双击启动（Windows）
 
 双击 `start.bat`，首次运行会自动安装依赖，然后自动打开服务。
@@ -60,18 +64,29 @@ npm start          # 启动服务
 vocab-app/
 ├── server.js              # Express 服务器 + PDF 解析接口
 ├── lib/words.js           # 单词提取 / 去重 / 词形归并逻辑
+│   └── pdf.worker.embed.cjs  # 构建时生成：预加载 pdf.js worker（见 build-worker-embed.js）
 ├── public/                # 前端界面
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
 ├── scripts/
+│   ├── build-worker-embed.js  # 生成 worker 嵌入文件（打包 exe 前置步骤）
 │   ├── gen-test-pdf.js    # 生成测试 PDF（pdfkit）
 │   ├── test-api.mjs       # 接口端到端测试
 │   └── test-api-real.mjs  # 用真实 PDF 测试
-├── test-files/            # 测试用 PDF
+├── test-files/            # 测试用 PDF（已 gitignore）
+├── dist/                  # exe 构建产物（已 gitignore）
 ├── start.bat              # Windows 一键启动
 └── package.json
 ```
+
+## 📦 打包独立 exe
+
+```bash
+npm run build:exe    # 生成 dist/vocabpal.exe（约 120MB，免安装 Node.js）
+```
+
+打包说明：exe 内置 Node 22 运行时；pdf.js 的 worker 代码被预加载为主线程 fake worker，因此无需在打包后动态加载任何外部文件。
 
 ## 🔌 API
 

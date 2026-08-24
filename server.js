@@ -6,6 +6,26 @@ const multer = require('multer');
 const { PDFParse } = require('pdf-parse');
 const { extractWords } = require('./lib/words');
 
+// 预加载 pdf.js worker（主线程 fake worker），设置 globalThis.pdfjsWorker，
+// 使 pdf.js 不再需要动态 import()（打包成 exe 后动态 import 不可用）。
+try {
+  require('./lib/pdf.worker.embed.cjs');
+} catch (e1) {
+  try {
+    // 开发模式兜底：嵌入文件缺失时，从 node_modules 现场生成
+    const fs = require('fs');
+    const srcPath = path.join(__dirname, 'node_modules', 'pdf-parse', 'dist', 'pdf-parse', 'cjs', 'pdf.worker.mjs');
+    const src = fs.readFileSync(srcPath, 'utf8')
+      .replace(/;\s*export\s*\{[^}]*\}\s*;?\s*$/, '')
+      .replace(/\bimport\.meta\.url\b/g, "'file:///pdf.worker.embed.cjs'");
+    const embedPath = path.join(__dirname, 'lib', 'pdf.worker.embed.cjs');
+    fs.writeFileSync(embedPath, "'use strict';\n" + src + "\n");
+    require(embedPath);
+  } catch (e2) {
+    console.warn('[worker] pdf.js worker 预加载失败，使用默认方式:', e2.message);
+  }
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3789;
 
@@ -67,9 +87,31 @@ app.use((err, req, res, next) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, app: 'VocabPal' }));
 
-app.listen(PORT, () => {
-  console.log('==================================================');
-  console.log(`  VocabPal 背单词助手已启动`);
-  console.log(`  请在浏览器打开: http://127.0.0.1:${PORT}`);
-  console.log('==================================================');
-});
+const PREFERRED_PORT = Number(process.env.PORT) || 3789;
+const MAX_PORT_TRIES = 10;
+
+function listen(port, remaining) {
+  const server = app.listen(port, () => {
+    console.log('==================================================');
+    console.log('  VocabPal 背单词助手已启动');
+    console.log(`  请在浏览器打开: http://127.0.0.1:${port}`);
+    console.log('==================================================');
+    // 独立 exe 双击运行时自动打开浏览器（设置 VOCABPAL_NO_OPEN=1 可关闭）
+    if (process.pkg && !process.env.VOCABPAL_NO_OPEN) {
+      try {
+        require('child_process').exec(`start "" "http://127.0.0.1:${port}"`);
+      } catch (e) { /* 忽略打开失败 */ }
+    }
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && remaining > 0) {
+      console.log(`端口 ${port} 被占用，尝试 ${port + 1} …`);
+      listen(port + 1, remaining - 1);
+    } else {
+      console.error('启动失败:', err.message);
+      process.exit(1);
+    }
+  });
+}
+
+listen(PREFERRED_PORT, MAX_PORT_TRIES);
