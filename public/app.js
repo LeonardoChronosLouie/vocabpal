@@ -2,7 +2,7 @@
 
 /* ============================================================
  * VocabPal 背单词助手 —— 前端逻辑
- * PDF 提取 → 去重单词表 → 点按发音 / 生词本 / 听音复习 / 导出
+ * PDF 提取 → 去重单词表 → 点击查看词义并发音 / 生词本 / 听音复习 / 导出
  * ============================================================ */
 
 /* ---------------- 全局状态 ---------------- */
@@ -253,7 +253,7 @@ function render() {
   listEl.hidden = false;
   listEl.innerHTML = list.map((w) => {
     const starred = isBookmarked(w.word);
-    return `<button class="chip" data-word="${esc(w.word)}" title="点按发音：${esc(w.word)}">
+    return `<button class="chip" data-word="${esc(w.word)}" title="点击查看词义与发音：${esc(w.word)}">
         <span class="word-text">${esc(w.word)}</span>
         <span class="count">${w.count}</span>
         <span class="icon-btn ${starred ? 'starred' : ''}" data-act="star" title="${starred ? '移出生词本' : '收藏到生词本'}" data-word="${esc(w.word)}">${starred ? '★' : '☆'}</span>
@@ -265,7 +265,7 @@ function render() {
     const hint = document.createElement('p');
     hint.className = 'muted';
     hint.style.cssText = 'flex-basis:100%;margin:6px 2px 0;font-size:12.5px;';
-    hint.textContent = '点击单词发音 · ☆ 移出生词本 · ⓘ 查看释义';
+    hint.textContent = '点击单词查看词义并发音 · ☆ 移出生词本';
     listEl.appendChild(hint);
   }
 }
@@ -297,7 +297,8 @@ $('#wordList').addEventListener('click', (e) => {
     openDetail(word);
     return;
   }
-  speak(word); // 整块点击 = 点按发音
+  // 点击单词卡片 = 发音 + 弹出词义
+  openDetail(word);
 });
 
 /* ---------------- 顶部操作 ---------------- */
