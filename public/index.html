@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VocabPal · 背单词助手</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">📖</span>
+    <div>
+      <h1>VocabPal <span class="sub">背单词助手</span></h1>
+      <p class="tagline">PDF 自动提取英文单词 · 自动去重 · 点按发音</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button id="reviewBtn" class="btn btn-ghost" title="把当前列表变成听力复习">🔁 听音复习</button>
+    <button id="exportTxtBtn" class="btn btn-ghost" title="导出 TXT">⬇ TXT</button>
+    <button id="exportCsvBtn" class="btn btn-ghost" title="导出 CSV">⬇ CSV</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- 上传区 -->
+  <section class="card upload-card">
+    <div id="dropZone" class="dropzone" tabindex="0">
+      <div class="dz-icon">📄</div>
+      <p class="dz-title">拖入 PDF 文件，或点击选择</p>
+      <p class="dz-hint">自动识别其中的英文单词，重复单词只保留一遍</p>
+      <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+    </div>
+
+    <div class="upload-meta">
+      <span id="fileName" class="filename">未选择文件</span>
+      <button id="extractBtn" class="btn btn-primary" disabled>⚡ 开始提取单词</button>
+    </div>
+
+    <div class="options">
+      <label class="opt">
+        <span>最短词长：<b id="minLenLabel">3</b> 个字母</span>
+        <input type="range" id="minLenRange" min="1" max="6" step="1" value="3">
+      </label>
+      <label class="opt switch">
+        <input type="checkbox" id="stemToggle" checked>
+        <span>词形归并 <i class="hint" title="learns / learning / learned 归并为 learn，避免重复">ⓘ</i></span>
+      </label>
+      <label class="opt switch">
+        <input type="checkbox" id="stopwordToggle" checked>
+        <span>过滤虚词 <i class="hint" title="the / and / of 等常见功能词，勾选后不收录">ⓘ</i></span>
+      </label>
+    </div>
+
+    <div id="status" class="status" hidden></div>
+  </section>
+
+  <!-- 单词列表 -->
+  <section class="card words-card">
+    <div class="tabs">
+      <button class="tab active" data-tab="pdf">📚 PDF 单词</button>
+      <button class="tab" data-tab="bookmarks">⭐ 生词本 <span id="bkCount" class="badge">0</span></button>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="searchInput" class="search" placeholder="🔍 搜索单词…">
+      <select id="sortSelect" class="sort">
+        <option value="freq-desc" selected>频率 ↓</option>
+        <option value="freq-asc">频率 ↑</option>
+        <option value="alpha">字母 A-Z</option>
+        <option value="length">长度 ↓</option>
+      </select>
+    </div>
+
+    <div id="stats" class="stats" hidden>
+      <span class="stat">📄 <b id="statFile">-</b></span>
+      <span class="stat">🔤 文档总词数 <b id="statTotal">0</b></span>
+      <span class="stat">✨ 去重后单词 <b id="statUnique">0</b></span>
+      <span class="stat">🚫 已过滤 <b id="statFiltered">0</b></span>
+    </div>
+
+    <div id="warning" class="warning" hidden></div>
+
+    <div id="emptyState" class="empty">
+      <div class="empty-icon">🫧</div>
+      <p>还没有单词。上传一个 PDF，即可自动提取并去重英文单词。</p>
+    </div>
+
+    <div id="wordList" class="word-list" hidden></div>
+  </section>
+</main>
+
+<!-- 单词详情弹窗 -->
+<div id="detailModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="detailWord"></h2>
+      <div class="modal-head-actions">
+        <button id="detailSpeakBtn" class="btn btn-round" title="点按发音">🔊</button>
+        <button id="detailStarBtn" class="btn btn-round" title="收藏到生词本">☆</button>
+        <button class="btn btn-round modal-close" data-close="detailModal">✕</button>
+      </div>
+    </div>
+    <p id="detailPhonetic" class="phonetic"></p>
+    <div id="detailMeanings" class="meanings"></div>
+    <p class="modal-foot">释义来自免费在线词典（需联网）；发音使用系统语音，离线可用。</p>
+  </div>
+</div>
+
+<!-- 听音复习弹窗 -->
+<div id="reviewModal" class="modal-overlay" hidden>
+  <div class="modal review">
+    <div class="modal-head">
+      <h2>🔁 听音复习</h2>
+      <button class="btn btn-round modal-close" data-close="reviewModal">✕</button>
+    </div>
+    <p id="reviewProgress" class="review-progress"></p>
+    <div id="reviewWord" class="review-word blurred">???</div>
+    <div class="review-actions">
+      <button id="reviewSpeakBtn" class="btn btn-ghost">🔊 再听一次</button>
+      <button id="reviewRevealBtn" class="btn btn-primary">👁 显示单词</button>
+      <div id="reviewButtons" class="review-mark hidden">
+        <button id="reviewKnownBtn" class="btn btn-success">✓ 认识</button>
+        <button id="reviewUnknownBtn" class="btn btn-danger">✗ 不认识</button>
+      </div>
+    </div>
+    <div id="reviewResult" class="review-result hidden">
+      <p class="review-summary"></p>
+      <div id="reviewUnknown" class="word-list"></div>
+      <div class="review-result-actions">
+        <button id="reviewRetryBtn" class="btn btn-ghost">🔄 再练不认识的</button>
+        <button class="btn btn-primary modal-close" data-close="reviewModal">完成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastBox" class="toast-box"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "vocabpal",
+  "version": "1.0.0",
+  "description": "背单词助手：从 PDF 自动提取英文单词、自动去重、点按发音",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "gen:test": "node scripts/gen-test-pdf.js",
+    "test:api": "node scripts/test-api.mjs"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "pdfkit": "^0.20.1"
+  }
+}
